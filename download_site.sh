@@ -49,22 +49,6 @@ function download_list_multy_process (){
 	wait
 }
 
-function download_detail_multy_process (){
-		
-		awk -vdir="${dir}/${d}/ALL/" 'BEGIN{FS="\t"}{print "if [ ! -s "dir"annonce_"$2".html ]; then url=\""$1"\"; output="dir"annonce_"$2".html;  download_pages ; fi"}' ${dir}/${d}/extract.tab > ${dir}/${d}/wgets/wget_file.txt
-		nb=`wc -l-f  ${dir}/${d}/wgets/wget_file.txt | awk '{print $1}' `
-        let "split = (nb / nb_processus) + 1"
-        split -l${split} -d ${dir}/${d}/wgets/wget_file.txt  ${dir}/${d}/wgets/wget_file.txt.
-        i=0
-        for wget_file in `ls ${dir}/${d}/wgets/wget_file.txt.*`
-        do
-			echo -e "set -x\n">>${wget_file}
-			. ${wget_file} >  ${dir}/${d}/log_${i} 2>&1 &
-			let "i=i+1"
-        done
-        wait
-}
-
 #
 # MAIN
 #
@@ -176,49 +160,50 @@ touch ${dir}/${d}/status
 
 if [ ${get_list_ind} -eq 1 ]; then
 	
-	echo  -e "list" > ${dir}/${d}/status 
-	# https://www.subito.it/annunci-italia/vendita/auto/?cvs=1
-	for type in "1" "2" "3" 
-	do	
-		
-		# https://www.subito.it/annunci-italia/vendita/auto/benzina/?cvs=2
-		
-		for carburant in "benzina" "diesel" "gpl" "elettrica" "ibrida" "metano" "altro"
+echo  -e "list" > ${dir}/${d}/status 
+# https://www.subito.it/annunci-italia/vendita/auto/?cvs=1
+for type in "1" "2" "3" 
+do	
+	
+	# https://www.subito.it/annunci-italia/vendita/auto/benzina/?cvs=2
+	
+	for carburant in "benzina" "diesel" "gpl" "elettrica" "ibrida" "metano" "altro"
+	do
+		. ${dir}/region.sql
+		echo "max_region=${max_region}"
+		for (( region = 1 ; region<=${max_region} ; region++ ))
 		do
-			. ${dir}/region.sql
-			echo "max_region=${max_region}"
-			for (( region = 1 ; region<=${max_region} ; region++ ))
-            do
-                m_rep=${REGION_ID[region]}	# https://www.subito.it/annunci-valle-d-aosta/vendita/auto/utilitaria/benzina/?cvs=1
-                for typologia in "utilitaria" "berlina" "station-wagon" "monovolume" "suv-fuoristrada" "cabrio" "coupe" "city-car" "altro"
-                do
-                    mkdir -p ${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}/LOG 
-                    output=${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}/page_0.html
-                    url="https://www.subito.it/annunci-${m_rep}/vendita/auto/${typologia}/${carburant}/?cvs=${type}"
-                    download_pages
-                    nb_site=$(awk -f ${dir}/nb_annonce.awk ${output})
-                    let "max_page=$nb_site/$nb_retrieve_per_page"
-						directory=${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}
-                        for (( page = 2 ; page <= ${max_page} ; page++ ))
-                        do
-                            output=${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}/page_${page}.html
-                            # https://www.subito.it/annunci-emilia-romagna/vendita/auto/city-car/benzina/?o=2&cvs=1
-                            url=https:"//www.subito.it/annunci-${m_rep}/vendita/auto/${typologia}/${carburant}/?o=${page}&cvs=${type}"
-                            echo -e "${output}\t${url}" >> ${directory}/$$.wget_file
-                        done
-                         
-                            list_file=${directory}/$$.wget_file
-                            download_list_multy_process	
-                            
-                            echo -e "parsing list" >> ${dir}/${d}/status		
-                            
-                            find ${directory}/ -type f -name '*.html' -exec awk -f ${dir}/liste_tab.awk -f ${dir}/put_html_into_tab.awk {} \; >> ${directory}/${typologia}.$$
-                            
-                            # Log Par typologia
-                            cat  ${directory}/${typologia}.$$  | sort -u -k1,1 >> ${directory}/${typologia}.tab
-                            nb_observe=`wc -l ${directory}/${typologia}.tab | awk '{print $1}'`
-                            cat  ${directory}/${typologia}.tab >> ${dir}/${d}/extract.$$
-                            echo -e "${typologia}\t${nb_site}\t${nb_observe}\tTYPOLOGIA"
+			m_rep=${REGION_ID[region]}	# https://www.subito.it/annunci-valle-d-aosta/vendita/auto/utilitaria/benzina/?cvs=1
+			for typologia in "utilitaria" "berlina" "station-wagon" "monovolume" "suv-fuoristrada" "cabrio" "coupe" "city-car" "altro"
+			do
+			    mkdir -p ${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}/LOG 
+			    output=${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}/page_0.html
+			    url="https://www.subito.it/annunci-${m_rep}/vendita/auto/${typologia}/${carburant}/?cvs=${type}"
+			    download_pages
+			    nb_site=$(awk -f ${dir}/nb_annonce.awk ${output})
+			    let "max_page=$nb_site/$nb_retrieve_per_page"
+			    directory=${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}
+			
+			for (( page = 2 ; page <= ${max_page} ; page++ ))
+			do
+			    output=${dir}/${d}/LISTING/${type}/${carburant}/${m_rep}/${typologia}/page_${page}.html
+			    # https://www.subito.it/annunci-emilia-romagna/vendita/auto/city-car/benzina/?o=2&cvs=1
+			    url=https:"//www.subito.it/annunci-${m_rep}/vendita/auto/${typologia}/${carburant}/?o=${page}&cvs=${type}"
+			    echo -e "${output}\t${url}" >> ${directory}/$$.wget_file
+			done
+		 
+			    list_file=${directory}/$$.wget_file
+			    download_list_multy_process	
+			    
+			    echo -e "parsing list" >> ${dir}/${d}/status		
+			    
+			    find ${directory}/ -type f -name '*.html' -exec awk -f ${dir}/liste_tab.awk -f ${dir}/put_html_into_tab.awk {} \; >> ${directory}/${typologia}.$$
+			    
+			    # Log Par typologia
+			    cat  ${directory}/${typologia}.$$  | sort -u -k1,1 >> ${directory}/${typologia}.tab
+			    nb_observe=`wc -l ${directory}/${typologia}.tab | awk '{print $1}'`
+			    cat  ${directory}/${typologia}.tab >> ${dir}/${d}/extract.$$
+			    echo -e "${typologia}\t${nb_site}\t${nb_observe}\tTYPOLOGIA"
                         
                 done
             done
